@@ -1,0 +1,78 @@
+{
+  "affects": "apps/web,docs/rfcs",
+  "created": "2026-07-31",
+  "priority": "P1",
+  "related": [
+    "0001",
+    "0002"
+  ],
+  "requires": [
+    "0002"
+  ],
+  "rfc": "0003",
+  "status": "draft",
+  "tags": [
+    "frontend",
+    "architecture",
+    "adapter",
+    "main",
+    "mock"
+  ],
+  "tasks": [
+    {
+      "depends_on": [],
+      "id": "T1",
+      "ref": null,
+      "status": "pending",
+      "title": "F0 前端骨架、路由、设计 token 与 RFC 目录初始化"
+    },
+    {
+      "depends_on": [
+        "T1"
+      ],
+      "id": "T2",
+      "ref": null,
+      "status": "pending",
+      "title": "稳定 View Model、Schema、错误模型、Session Draft Store 与 Mock Ports"
+    },
+    {
+      "depends_on": [
+        "T2"
+      ],
+      "id": "T3",
+      "ref": null,
+      "status": "pending",
+      "title": "F1 创建会话、菜单上传、识别任务 UI 与 Mock 流程"
+    },
+    {
+      "depends_on": [
+        "T2"
+      ],
+      "id": "T4",
+      "ref": null,
+      "status": "pending",
+      "title": "F2 菜单校正、成员需求、预算优惠页面与 Mock 场景"
+    },
+    {
+      "depends_on": [
+        "T3",
+        "T4"
+      ],
+      "id": "T5",
+      "ref": null,
+      "status": "pending",
+      "title": "F3 推荐结果、冲突页、备选方案、版本与错误恢复"
+    },
+    {
+      "depends_on": [
+        "T5"
+      ],
+      "id": "T6",
+      "ref": null,
+      "status": "pending",
+      "title": "F4 工程质量、响应式、可访问性、测试与 main 分支联调适配"
+    }
+  ],
+  "title": "前端多人点餐 Demo 架构与 main 分支接口适配",
+  "updated": "2026-07-31"
+}
