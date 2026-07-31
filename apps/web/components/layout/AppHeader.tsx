@@ -10,7 +10,7 @@ export default function AppHeader({ title }: Readonly<{ title: string }>) {
       <div className="session-title" aria-live="polite">{title}</div>
       <nav className="header-actions" aria-label="页面辅助操作">
         <Link href="/session/new">新建</Link>
-        <button type="button">帮助</button>
+        <span className="runtime-badge"><span aria-hidden="true">●</span> 纯 Mock</span>
       </nav>
     </header>
   );

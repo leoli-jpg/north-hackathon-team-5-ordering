@@ -26,6 +26,15 @@ go.work.sum
 
 # env file
 .env
+.env.local
+
+# Frontend build and dependency artifacts
+apps/web/.next/
+apps/web/node_modules/
+apps/web/.next-dev.log
+apps/web/playwright-report/
+apps/web/test-results/
+apps/web/tsconfig.tsbuildinfo
 
 # Python cache and test artifacts
 __pycache__/
