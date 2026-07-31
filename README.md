@@ -66,46 +66,6 @@ flowchart TD
 - T1 已完成：本地目录边界、Docker Compose 基础拓扑、环境变量模板和模块 README 已确认。
 - 后续 T2 将实现数据库 schema 与迁移脚本。
 
-## RFC-0001 本地推荐 Agent mock
-
-本仓库也保留了 RFC-0001 的本地点餐推荐 Agent mock 环境，用于演示“多人聚餐点餐推荐系统”的输入输出链路。
-
-快速开始：
-
-```bash
-python -m agents.ordering_agent --pretty
-```
-
-会输出结构化 JSON，包含菜单识别结果、成员需求、推荐方案、总价和约束说明。
-
-测试：
-
-```bash
-python -m pytest -q
-```
-
-HTTP mock 服务：
-
-```bash
-python -m agents.ordering_agent.server
-```
-
-服务启动后：
-
-```bash
-curl http://127.0.0.1:8000/health
-```
-
-提交推荐请求：
-
-```bash
-curl -X POST http://127.0.0.1:8000/recommend \
-  -H 'Content-Type: application/json' \
-  -d '{"menu_path":"agents/ordering_agent/data/sample_menu.txt","request_path":"agents/ordering_agent/data/sample_request.txt"}'
-```
-
-更多说明见 `agents/ordering_agent/README.md`。
-
 ## 环境变量与 smoke test
 
 1. 复制 `.env.example` 为 `.env`，填写 `OPENAI_API_KEY`、`LLM_API_KEY`、`LLM_BASE_URL`、`LLM_MODEL` 等配置。
