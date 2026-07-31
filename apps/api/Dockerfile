@@ -1,10 +1,9 @@
-# RFC-0002: API service image for local ordering system demos.
+# RFC-0002: Placeholder API service image for T1 topology validation.
+# T3 will replace this with the real Node.js/TypeScript API service.
 FROM node:20-alpine
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci --omit=dev
+COPY package.json ./
 COPY server.js ./
-COPY src ./src
 COPY database ./database
 EXPOSE 3001
-CMD ["npm", "start"]
+CMD ["node", "server.js"]

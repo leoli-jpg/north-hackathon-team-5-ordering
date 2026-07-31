@@ -298,7 +298,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    subgraph App["services/agent"]
+    subgraph App["agents/ordering_agent"]
         Agent["run.py / NexAU Agent"]
         Prompt["systemprompt.md\n工作流提示词"]
         Config["ordering_agent.yaml\nAgent 配置"]
@@ -418,9 +418,9 @@ graph TD
 
 范围：
 
-- 创建本地项目结构 `services/agent/`。
-- 添加 NexAU Agent 配置文件、系统提示词和 `__main__.py` 或 `run.py` 入口。
-- 定义本地工具绑定方式：`yaml_path` + Python import-string `binding: services.agent.run_ordering_mock:run_ordering_mock`。
+- 创建本地项目结构 `agents/ordering_agent/`。
+- 添加 NexAU Agent 配置文件、系统提示词和 `__main__.py` 入口。
+- 定义本地工具绑定方式：`yaml_path` + Python import-string `binding: agents.ordering_agent.run_ordering_mock:run_ordering_mock`。
 - 绑定 NexAU 原生工具：`read_file` / `read_many_files`、`list_directory` / `glob`、`read_visual_file`。
 - 配置 `.env.example`，说明 LLM 环境变量，并提示菜单图片场景需要使用支持视觉输入的多模态模型。
 
@@ -510,7 +510,7 @@ graph TD
 
 预期新增文件/目录：
 
-- `services/agent/`
+- `agents/ordering_agent/`
   - `ordering_agent.yaml`
   - `systemprompt.md`
   - `run.py` / `__main__.py`

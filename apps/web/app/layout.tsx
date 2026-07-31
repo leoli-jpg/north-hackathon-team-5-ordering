@@ -5,6 +5,7 @@
  */
 import "@/styles/globals.css";
 import "@/styles/tokens.css";
+import "@/styles/page.css";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 

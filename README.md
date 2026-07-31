@@ -9,8 +9,8 @@ RFC-0002 点餐系统本地 MVP 仓库。
 | 模块 | 路径 | 职责 |
 | --- | --- | --- |
 | Next.js 前端 | `apps/web` | 菜单管理、推荐结果展示、图片候选确认入口 |
-| 接口服务 | `apps/api` | REST API、推荐引擎、图片候选接口、数据库访问边界；通过 Docker 容器运行 |
-| Postgres | `docker/compose.yaml` | 本地持久化数据库容器 |
+| 接口服务 | `apps/api` | REST API、推荐引擎、图片候选接口、数据库访问边界 |
+| Postgres | `docker/compose.yaml` | 本地持久化数据库 |
 | Agent skill | `services/agent` | NexAU Agent 到 API 服务的 skill 包装层 |
 | 共享包 | `packages/shared` | 前后端与 Agent skill 共享类型、DTO、常量 |
 
@@ -33,11 +33,11 @@ flowchart TD
    cp docker/.env.example docker/.env
    ```
 
-2. 启动 Postgres、迁移容器与 API 服务容器：
+2. 启动 Postgres 与 API 占位服务：
 
    ```bash
    cd docker
-   docker compose up --build postgres migrate api
+   docker compose up postgres api
    ```
 
 3. 在另一个终端启动 Next.js 前端（T4 实现后）：
@@ -59,10 +59,16 @@ flowchart TD
 - `DATABASE_URL`：API 服务内部连接 Postgres 的 URL，Docker Compose 中默认指向 `postgres:5432/ordering`。
 - `API_CORS_ORIGIN`：前端默认来源，本地为 `http://localhost:3000`。
 - `API_PORT`：接口服务端口，本地默认 `3001`。
-- `POSTGRES_PORT`：宿主机暴露端口，本地默认 `55432`，避免占用本机默认 Postgres 端口。
+- `POSTGRES_PORT`：宿主机暴露端口，本地默认 `5432`。
 
 ## 当前状态
 
 - T1 已完成：本地目录边界、Docker Compose 基础拓扑、环境变量模板和模块 README 已确认。
-- T2 已完成：数据库 schema 与迁移脚本已实现。
-- T3 已完成：API 服务已实现菜品 CRUD、推荐接口、图片候选识别与人工确认入库接口。
+- 后续 T2 将实现数据库 schema 与迁移脚本。
+
+## 环境变量与 smoke test
+
+1. 复制 `.env.example` 为 `.env`，填写 `OPENAI_API_KEY`、`LLM_API_KEY`、`LLM_BASE_URL`、`LLM_MODEL` 等配置。
+2. 可选：运行 smoke test：`python scripts/smoke_llm.py`
+
+CI 默认不真实调用 LLM；需要验证 OpenAI-compatible 网关时，设置 `RUN_LLM_SMOKE=true` 并提供对应 `LLM_API_KEY` 与 `LLM_BASE_URL`。

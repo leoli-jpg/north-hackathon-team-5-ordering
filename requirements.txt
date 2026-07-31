@@ -1,2 +1,4 @@
 nexau==0.4.1
+httpx[socks]>=0.28.1
+openai>=2.14.0
 pytest>=8.0
