@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 340" role="img" aria-label="Mock 菜单第一页">
+  <defs>
+    <linearGradient id="menu1Bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff7ed"/>
+      <stop offset="1" stop-color="#ffe8d6"/>
+    </linearGradient>
+    <linearGradient id="menu1Accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d95f2d"/>
+      <stop offset="1" stop-color="#f2a05a"/>
+    </linearGradient>
+  </defs>
+  <rect width="260" height="340" rx="24" fill="url(#menu1Bg)"/>
+  <rect x="22" y="24" width="216" height="74" rx="18" fill="#fffaf2"/>
+  <circle cx="50" cy="61" r="18" fill="url(#menu1Accent)"/>
+  <rect x="78" y="44" width="118" height="10" rx="5" fill="#241a12" opacity="0.82"/>
+  <rect x="78" y="62" width="82" height="8" rx="4" fill="#745f4b" opacity="0.65"/>
+  <rect x="22" y="114" width="216" height="46" rx="15" fill="#fffaf2"/>
+  <rect x="38" y="129" width="120" height="10" rx="5" fill="#241a12" opacity="0.78"/>
+  <rect x="38" y="145" width="92" height="8" rx="4" fill="#745f4b" opacity="0.55"/>
+  <circle cx="206" cy="137" r="14" fill="#e6f4ed"/>
+  <path d="M199 137l5 5 10-12" fill="none" stroke="#3f9b75" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="22" y="174" width="216" height="46" rx="15" fill="#fffaf2"/>
+  <rect x="38" y="189" width="132" height="10" rx="5" fill="#241a12" opacity="0.74"/>
+  <rect x="38" y="205" width="78" height="8" rx="4" fill="#745f4b" opacity="0.5"/>
+  <rect x="184" y="188" width="34" height="18" rx="9" fill="#fff1c7" stroke="#d8a83a"/>
+  <rect x="22" y="234" width="216" height="46" rx="15" fill="#fffaf2"/>
+  <rect x="38" y="249" width="112" height="10" rx="5" fill="#241a12" opacity="0.7"/>
+  <rect x="38" y="265" width="92" height="8" rx="4" fill="#745f4b" opacity="0.48"/>
+  <rect x="180" y="248" width="38" height="18" rx="9" fill="#d95f2d"/>
+</svg>
