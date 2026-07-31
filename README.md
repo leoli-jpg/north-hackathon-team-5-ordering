@@ -65,10 +65,3 @@ flowchart TD
 
 - T1 已完成：本地目录边界、Docker Compose 基础拓扑、环境变量模板和模块 README 已确认。
 - 后续 T2 将实现数据库 schema 与迁移脚本。
-
-## 环境变量与 smoke test
-
-1. 复制 `.env.example` 为 `.env`，填写 `OPENAI_API_KEY`、`LLM_API_KEY`、`LLM_BASE_URL`、`LLM_MODEL` 等配置。
-2. 可选：运行 smoke test：`python scripts/smoke_llm.py`
-
-CI 默认不真实调用 LLM；需要验证 OpenAI-compatible 网关时，设置 `RUN_LLM_SMOKE=true` 并提供对应 `LLM_API_KEY` 与 `LLM_BASE_URL`。

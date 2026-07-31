@@ -1,0 +1,55 @@
+# RFC-0002: NexAU Ordering System Agent configuration.
+#
+# T5 将 Agent 运行时放在 services/agent，并通过 skill 工具调用结构化
+# 接口；NexAU 只负责自然语言理解、工具编排和结果解释。
+
+type: agent
+name: ordering-system-agent
+description: >
+  RFC-0002 点餐系统 Agent。通过 skill 包装层读取菜单/推荐接口，将用户
+  的自然语言请求转换为结构化 API 调用，并输出可解释推荐结果。
+system_prompt_type: file
+system_prompt: ./systemprompt.md
+
+llm_config:
+  model: ${env.LLM_MODEL}
+  base_url: ${env.LLM_BASE_URL}
+  api_key: ${env.LLM_API_KEY}
+  temperature: 0
+  max_tokens: 4096
+  timeout: 120
+  api_type: openai_chat_completion
+
+tool_call_mode: structured
+max_iterations: 40
+timeout: 300
+retry_attempts: 3
+
+sandbox_config:
+  type: local
+  work_dir: ${env.SANDBOX_WORK_DIR}
+  respect_git_ignore: true
+
+tools:
+  - name: read_file
+    yaml_path: ./tools/native/read_file.yaml
+    binding: nexau.archs.tool.builtin.file_tools:read_file
+  - name: read_many_files
+    yaml_path: ./tools/native/read_many_files.yaml
+    binding: nexau.archs.tool.builtin.file_tools:read_many_files
+  - name: list_directory
+    yaml_path: ./tools/native/list_directory.yaml
+    binding: nexau.archs.tool.builtin.file_tools:list_directory
+  - name: glob
+    yaml_path: ./tools/native/glob.yaml
+    binding: nexau.archs.tool.builtin.file_tools:glob
+  - name: read_visual_file
+    yaml_path: ./tools/native/read_visual_file.yaml
+    binding: nexau.archs.tool.builtin.file_tools:read_visual_file
+
+  - name: get_menu_items
+    yaml_path: ./tools/api/get_menu_items.yaml
+    binding: services.agent.skills.api_client:get_menu_items_tool
+  - name: create_recommendation
+    yaml_path: ./tools/api/create_recommendation.yaml
+    binding: services.agent.skills.api_client:create_recommendation_tool

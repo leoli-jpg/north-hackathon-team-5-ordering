@@ -1,0 +1,32 @@
+# RFC-0002: NexAU Ordering System Agent - native list_directory tool.
+#
+# Used to discover local menu, request, and visual menu file paths when needed.
+
+type: tool
+name: list_directory
+description: >
+  List immediate files and subdirectories in a directory. Use this to discover
+  sample menus, request files, and local menu image paths.
+input_schema:
+  type: object
+  properties:
+    dir_path:
+      type: string
+      description: Path to the directory to list.
+    ignore:
+      type: array
+      items:
+        type: string
+      description: Optional glob patterns to ignore.
+    file_filtering_options:
+      type: object
+      description: File filtering options such as respect_git_ignore.
+    show_hidden:
+      type: boolean
+      description: Whether to include hidden files and directories.
+      default: true
+  required:
+    - dir_path
+disable_parallel: false
+lazy: false
+defer_loading: false
