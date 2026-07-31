@@ -2,15 +2,15 @@
 
 ## 摘要
 
-本 RFC 设计 TOPIC B「点餐系统」的基础架构：本地 Next.js 前端负责菜品录入、菜单展示和推荐结果展示；本地接口服务负责菜品 CRUD、推荐引擎、图片候选识别接口和数据库访问；Postgres 作为本地持久化数据库；NexAU Agent 通过 skill 调用接口服务读取菜品信息并发起推荐。
+本 RFC 设计 TOPIC B「点餐系统」的后端基础架构：本地接口服务负责菜品 CRUD、推荐引擎、图片候选识别接口和数据库访问；Postgres 作为本地持久化数据库；前端和 NexAU Agent 作为外部调用方通过 API 契约访问数据与推荐能力。
 
-本 RFC 首期聚焦 MVP：前端手工维护菜单、Agent skill 读取数据库、根据预算/人数/成员约束生成推荐组合，并预留「识别图片添加菜品」作为挑战能力。挑战能力先通过候选表与人工确认实现，不把 OCR 准确率作为基础能力验收条件。
+本 RFC 首期聚焦 MVP：维护稳定的数据库 schema、API 服务、Docker 本地部署方式，以及可供前端或 Agent 调用的推荐/图片候选接口。前端页面实现由 RFC-0003 负责，Agent skill 包装层由后续外部调用方实现；本 RFC 只承诺接口、数据库表和容器化部署边界。
 
 ## 动机
 
-RFC-0001 已定义 NexAU 多人点餐推荐 Agent 的能力边界，但首期实现需要从本地文字菜单/示例数据升级为可演示的业务系统：菜单需要被持久化，前端需要能维护菜品，Agent 需要通过稳定接口读取结构化菜品信息，推荐结果也需要可复现、可展示、可扩展。
+RFC-0001 已定义 NexAU 多人点餐推荐 Agent 的能力边界，RFC-0003 已推进前端 Demo 架构。首期可演示业务系统需要先把菜单数据持久化、把推荐逻辑集中到可测试的 API 服务中，并提供稳定的数据访问边界。
 
-如果缺少统一架构和数据库 schema，容易出现三类问题：前端直接操作数据库导致权限和部署复杂；Agent 直接读取临时文件或前端状态导致数据不可复用；图片识别结果直接写入正式菜单导致错误数据污染推荐链路。因此本 RFC 将系统拆成前端、接口服务、数据库、Agent skill 四个明确边界，并用候选表隔离图片识别风险。
+如果缺少统一架构和数据库 schema，容易出现三类问题：调用方直接操作数据库导致权限和部署复杂；推荐逻辑散落在前端或 Agent 中导致结果不可复现；图片识别结果直接写入正式菜单导致错误数据污染推荐链路。因此本 RFC 将系统边界收敛为接口服务、数据库和 Docker 部署，并用候选表隔离图片识别风险。
 
 ## 设计
 
@@ -18,66 +18,66 @@ RFC-0001 已定义 NexAU 多人点餐推荐 Agent 的能力边界，但首期实
 
 本地演示环境采用以下拓扑：
 
-- `apps/web`：Next.js 前端，面向用户完成菜单管理和推荐交互。
 - `apps/api`：接口服务，承载 REST API、数据库访问、推荐引擎和图片候选能力。
-- `services/agent`：NexAU Agent 运行时与 skill 包装层，将自然语言请求转成结构化接口调用。
-- `packages/shared`：前后端共享的类型、常量和 DTO。
-- `docker/`：本地 Postgres 与接口服务容器编排。
+- `apps/api/database/`：数据库 schema 与迁移脚本。
+- `docker/`：Postgres、migrate 与 API 服务的本地容器编排。
+- 前端 Demo（`apps/web`，RFC-0003）和 Agent skill：仅作为 API 调用方；页面实现和 skill 包装层不由 RFC-0002 维护。
 
 ```mermaid
 flowchart TD
-    U["用户"] --> FE["Next.js 前端"]
-    FE --> API["接口服务 / API"]
+    FE["前端 / RFC-0003"] --> API["接口服务 / API"]
+    AG["NexAU Agent / Skill"] --> API
     API --> DB[("Postgres")]
     API --> REC["推荐引擎"]
     API --> IMG["图片上传 / 候选识别"]
-    AG["NexAU Agent"] --> SKILL["Agent Skill 层"]
-    SKILL --> API
-    SKILL --> DB
+    API --> MIG["migrate 容器"]
+    MIG --> DB
 
     API -->|REST| FE
-    SKILL -->|tool call| API
+    API -->|REST / tool call| AG
 ```
 
 核心原则：
 
-1. **前端不直连数据库**：所有数据访问都通过 API 服务。
-2. **Agent 只通过 skill 调用能力**：Agent 不直接操作 UI，也不直接写数据库。
-3. **推荐引擎可独立验证**：推荐逻辑放在 API 服务内，便于单元测试和回归测试。
-4. **图片识别走候选表**：识别结果先进入 staging 区，再人工确认后进入正式菜品表。
+1. **调用方不直连数据库**：前端和 Agent 都通过 API 服务访问数据。
+2. **推荐引擎可独立验证**：推荐逻辑放在 API 服务内，便于单元测试和回归测试。
+3. **图片识别走候选表**：识别结果先进入 staging 区，再人工确认后进入正式菜品表。
+4. **服务与数据库容器化**：验证和部署时，API、迁移任务和 Postgres 均在 Docker 容器中运行。
 
 ### 范围与非目标
 
 #### 首期范围
 
-- 支持前端页面手工新增、修改、查询菜品信息。
-- 支持菜品基础字段：名称、描述、价格、分类、状态、图片 URL、扩展属性。
-- 支持菜品标签、食材、过敏原、辣度等结构化信息。
-- 支持 Agent 通过 skill 读取数据库中的菜品信息。
-- 支持根据预算、人数和成员约束生成推荐菜品组合。
-- 支持推荐结果包含总价、菜品列表、理由说明和约束满足情况。
+- 维护菜品基础字段：名称、描述、价格、分类、状态、图片 URL、扩展属性。
+- 维护菜品标签、食材、过敏原、辣度等结构化信息。
+- 提供菜品 CRUD、推荐接口、推荐结果查询和图片候选接口。
+- 提供推荐结果中的总价、菜品列表、理由说明和约束满足情况。
 - 预留图片识别挑战能力：上传图片、识别候选菜品、人工确认后入库。
+- 维护本地 Docker 部署拓扑：Postgres、migrate、API 服务均在容器中运行。
+- 提供 API 契约，供 RFC-0003 前端或后续 Agent skill 适配。
 
 #### 首期非目标
 
+- 不实现或维护 Next.js 前端页面、路由、状态管理和 UI 交互。
+- 不实现或维护 Agent skill 包装层、Agent 参数转换或自然语言输出格式。
 - 不实现支付、优惠券、复杂会员体系或生产级权限系统。
 - 不把 OCR 自动识别作为基础能力，也不承诺图片识别完全准确。
-- 不要求前端直接连接 Postgres。
+- 不让前端或 Agent 直接连接 Postgres。
 - 不让 Agent 直接修改正式菜单表。
 - 不在首期实现复杂多目标优化器；首期推荐以可行性和可解释性为主。
 
 ### 当前假设
 
 - 本地演示环境，不需要生产级认证。
-- 前端使用 Next.js。
-- 后端接口服务建议采用 Node.js/TypeScript + Prisma，或等价的轻量 API 框架。
-- 本地 Docker 部署 Postgres；接口服务可通过容器访问数据库。
-- Agent skill 通过 API 服务访问数据库，而不是由前端或 Agent 直接操作数据库。
+- 前端使用 Next.js，但由 RFC-0003 维护；本 RFC 只提供 API 契约。
+- 后端接口服务采用 Node.js/JavaScript API 服务。
+- 本地验证和部署时，Postgres、migrate 与 API 服务均运行在 Docker 容器中。
+- 前端和 Agent skill 通过 API 服务访问数据库，而不是由前端或 Agent 直接操作数据库。
 - 图片识别先走候选表，再人工确认入库。
 
 ### 本地部署拓扑
 
-建议本地使用 `docker compose` 管理基础设施，前端在宿主机运行。
+本地验证和部署使用 `docker compose` 管理基础设施、迁移任务和接口服务；前端或 Agent 如需要联调，只通过宿主机暴露的 API 端口访问。
 
 ```yaml
 services:
@@ -88,18 +88,32 @@ services:
       POSTGRES_PASSWORD: ordering
       POSTGRES_DB: ordering
     ports:
-      - "5432:5432"
+      - "55432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
 
-  api:
-    build: ./apps/api
-    ports:
-      - "3001:3001"
+  migrate:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+    command: ["npm", "run", "db:migrate"]
     depends_on:
       - postgres
     environment:
       DATABASE_URL: postgres://ordering:ordering@postgres:5432/ordering
+
+  api:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://ordering:ordering@postgres:5432/ordering
+      PORT: "3001"
 
 volumes:
   pgdata:
@@ -107,20 +121,20 @@ volumes:
 
 建议运行方式：
 
-- `npm run dev`：启动 Next.js 前端。
-- `docker compose up postgres api`：启动数据库和接口服务。
-- `python -m services.agent.run`：启动 NexAU Agent，或按项目实际命令运行。
+- `docker compose -f docker/compose.yaml up postgres migrate api`：启动数据库、迁移任务和接口服务。
+- 前端或 Agent 联调时访问 `http://localhost:3001`。
+- 如需宿主机调试数据库，可使用 `localhost:55432` 连接容器内 Postgres。
 
 ### 关键设计决策
 
 #### 1. API 服务作为数据访问边界
 
-前端和 Agent 都通过 API 服务访问数据。API 服务负责权限、校验、事务、推荐逻辑和数据库访问，避免前端或 Agent 直接操作 Postgres。
+前端和 Agent 都通过 API 服务访问数据。API 服务负责校验、事务、推荐逻辑和数据库访问，避免前端或 Agent 直接操作 Postgres。
 
 理由：
 
-- 前端只需关心用户交互，不承担数据库连接配置。
-- Agent skill 可以保持轻量，只负责参数转换和结果解释。
+- 前端只需维护用户交互，不承担数据库连接配置；RFC-0002 只向它暴露 API 契约。
+- Agent skill 可以保持轻量，只负责参数转换和结果解释；本 RFC 不实现 skill 包装层。
 - 推荐逻辑集中在 API 服务中，便于单元测试和回归测试。
 
 #### 2. 价格使用 `price_cents` 整数存储
@@ -369,24 +383,16 @@ EXECUTE FUNCTION set_updated_at();
 ```mermaid
 sequenceDiagram
     participant U as 用户
-    participant FE as Next.js
+    participant FE as 前端 / Agent 调用方
     participant API as 接口服务
     participant DB as Postgres
-    participant AG as NexAU Agent
-    participant SK as Agent Skill
 
     U->>FE: 输入预算、人数、成员约束
     FE->>API: POST /api/recommendations
     API->>DB: 读取 active 菜品与标签
     API->>API: 计算候选组合与约束校验
     API-->>FE: 返回推荐方案
-    FE-->>U: 展示总价、菜品、理由
-
-    AG->>SK: 发起推荐请求
-    SK->>API: 调用推荐 skill
-    API->>DB: 读取菜品数据
-    API-->>SK: 返回推荐结果
-    SK-->>AG: 交付结构化结果
+    FE-->>U: 展示或解释总价、菜品、理由
 ```
 
 推荐策略：
@@ -402,7 +408,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant U as 用户
-    participant FE as Next.js
+    participant FE as 前端 / Agent 调用方
     participant API as 接口服务
     participant IMG as 图片识别模块
     participant DB as Postgres
@@ -428,43 +434,47 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    subgraph Web["apps/web"]
-        MenuPage["菜单管理页面"]
-        RecPage["推荐结果页面"]
-        ImagePage["图片识别页面"]
+    subgraph Caller["外部调用方"]
+        FE["前端 RFC-0003"]
+        AG["Agent / Skill"]
     end
 
     subgraph API["apps/api"]
         MenuAPI["菜品 CRUD API"]
         RecEngine["推荐引擎"]
         ImageAPI["图片上传/识别 API"]
-        SkillAPI["Agent Skill API"]
+        CandidateAPI["候选确认 API"]
         DBAccess["数据库访问层"]
     end
 
-    subgraph DB["Postgres"]
+    subgraph Docker["docker/"]
+        Migrate["migrate 容器"]
+        Postgres["Postgres 容器"]
+    end
+
+    subgraph DB["Postgres schema"]
         MenuItem["menu_items"]
         Tags["tags / menu_item_tags"]
         Ingredients["menu_item_ingredients"]
         Sessions["recommendation_sessions / items"]
+        Images["menu_images"]
         Candidates["menu_item_candidates"]
     end
 
-    subgraph Agent["services/agent"]
-        NexAU["NexAU Agent"]
-        Skill["Skill 包装层"]
-    end
-
-    MenuPage --> MenuAPI
-    RecPage --> RecEngine
-    ImagePage --> ImageAPI
-    NexAU --> Skill --> SkillAPI
+    FE --> MenuAPI
+    FE --> RecEngine
+    FE --> ImageAPI
+    AG --> MenuAPI
+    AG --> RecEngine
     MenuAPI --> DBAccess --> MenuItem
     MenuAPI --> DBAccess --> Tags
     MenuAPI --> DBAccess --> Ingredients
     RecEngine --> DBAccess --> MenuItem
     RecEngine --> Sessions
-    ImageAPI --> DBAccess --> Candidates
+    ImageAPI --> DBAccess --> Images
+    CandidateAPI --> DBAccess --> Candidates
+    Migrate --> Postgres
+    API --> Postgres
 ```
 
 ## 权衡取舍
@@ -481,7 +491,8 @@ flowchart LR
 
 ### 缺点
 
-- 本地需要同时运行前端、接口服务和 Postgres，启动步骤比单文件 Demo 复杂。
+- RFC-0002 本身需要同时运行 Postgres、migrate 和 API 服务，启动步骤比单文件 Demo 复杂。
+- 前端和 Agent 如要联调，需要额外适配 RFC-0002 的 API 契约。
 - API 服务增加了一层抽象，首期实现成本高于纯脚本方案。
 - 标签和食材拆分建模比单字段 JSON 更复杂，但可测试性和约束校验能力更好。
 - 图片识别挑战能力需要候选确认流程，不能承诺全自动准确入库。
@@ -490,9 +501,10 @@ flowchart LR
 
 ### 阶段划分
 
-1. **阶段一：确认本地部署拓扑与模块边界**
-   - 确定 Next.js 前端、接口服务、Postgres、Agent skill 的目录结构。
-   - 确定本地 Docker 启动方式和环境变量。
+1. **阶段一：确认 API、数据库和 Docker 部署边界**
+   - 明确 RFC-0002 只维护 `apps/api`、数据库 schema/迁移脚本和 `docker/` 本地部署拓扑。
+   - 明确前端和 Agent 是 API 调用方，不由 RFC-0002 实现页面或 skill 包装层。
+   - 确定 Docker 中 Postgres、migrate、API 的运行方式和环境变量。
 
 2. **阶段二：数据库 schema 与迁移脚本**
    - 实现菜品、标签、食材、推荐会话、推荐明细、图片候选表。
@@ -502,17 +514,10 @@ flowchart LR
    - 实现菜品 CRUD、推荐接口、图片候选接口。
    - 将推荐引擎与数据库访问层解耦。
 
-4. **阶段四：前端页面**
-   - 实现菜单管理页面和推荐结果展示页面。
-   - 预留图片上传与候选确认页面。
-
-5. **阶段五：Agent skill 包装层**
-   - 实现 Agent skill 读取菜品和发起推荐的接口。
-   - 将 Agent 输出映射为前端可展示的结构化推荐结果。
-
-6. **阶段六：验证与文档**
-   - 补充单元测试、接口测试和端到端验证。
-   - 编写本地 Docker 启动说明和 Demo 数据说明。
+4. **阶段四：API/数据库验证与文档**
+   - 补充数据库迁移测试、推荐引擎单元测试和接口测试。
+   - 编写 Docker 启动说明、API 契约说明和数据库表说明。
+   - 前端和 Agent 联调属于外部调用方适配，不阻塞 RFC-0002 的 API/DB 验收。
 
 ### 子任务分解
 
@@ -520,47 +525,42 @@ flowchart LR
 
 ```mermaid
 graph TD
-    T1["T1 本地部署拓扑与模块边界"]
+    T1["T1 API、数据库和 Docker 部署边界"]
     T2["T2 数据库 schema 与迁移"]
     T3["T3 接口服务基础能力"]
-    T4["T4 Next.js 前端页面"]
-    T5["T5 Agent skill 包装层"]
-    T6["T6 验证、测试与启动说明"]
+    T4["T4 API/数据库验证与文档"]
 
     T1 --> T2
     T2 --> T3
     T3 --> T4
-    T3 --> T5
-    T4 --> T6
-    T5 --> T6
 ```
 
 #### 子任务列表
 
 | ID | 标题 | 依赖 | Ref |
 | --- | --- | --- | --- |
-| T1 | 确认本地部署拓扑与模块边界 | 无 |  |
+| T1 | 确认 API、数据库和 Docker 部署边界 | 无 |  |
 | T2 | 实现数据库 schema 与迁移脚本 | T1 |  |
 | T3 | 实现接口服务基础能力 | T2 |  |
-| T4 | 实现 Next.js 菜单管理与推荐结果展示页面 | T3 |  |
-| T5 | 实现 Agent skill 包装层并接入推荐接口 | T3 |  |
-| T6 | 补充端到端验证、测试与本地 Docker 启动说明 | T4, T5 |  |
+| T4 | 补充 API/数据库验证、测试与 Docker 启动说明 | T3 |  |
+
+> 说明：前端页面实现和 Agent skill 包装层不属于 RFC-0002 范围。前端 Demo 由 RFC-0003 维护；Agent skill 可在后续作为 API 调用方自行适配。
 
 #### 子任务定义
 
-##### T1 确认本地部署拓扑与模块边界
+##### T1 确认 API、数据库和 Docker 部署边界
 
 范围：
 
-- 创建或确认 `apps/web`、`apps/api`、`services/agent`、`packages/shared`、`docker/` 目录。
-- 明确前端、接口服务、数据库、Agent skill 的调用关系。
-- 定义本地环境变量和 Docker Compose 基础配置。
+- 创建或确认 `apps/api/`、数据库 schema/迁移脚本、`docker/` 目录。
+- 明确前端、Agent 只通过 API 访问数据，不直接连接 Postgres。
+- 定义 Docker Compose 中 Postgres、migrate、API 的环境变量和依赖关系。
 
 验收标准：
 
 - 本地项目结构清晰，职责边界明确。
-- `docker compose` 能启动 Postgres，接口服务可通过环境变量连接数据库。
-- README 或 RFC 能说明本地启动方式。
+- `docker compose` 能启动 Postgres、migrate 和 API 服务。
+- README 或 RFC 能说明本地启动方式和 API 访问地址。
 
 ##### T2 实现数据库 schema 与迁移脚本
 
@@ -587,64 +587,32 @@ graph TD
 
 验收标准：
 
-- 前端可通过 API 新增、修改、查询菜品。
+- API 调用方可通过 REST API 新增、修改、查询菜品。
 - 推荐接口能返回总价、菜品列表和理由说明。
 - 图片识别接口不直接污染正式菜单表。
 
-##### T4 实现 Next.js 菜单管理与推荐结果展示页面
-
-范围：
-
-- 实现菜单列表、新增、编辑、下架/删除页面。
-- 实现预算、人数、成员约束输入页面。
-- 展示推荐结果、总价、已满足约束和冲突说明。
-- 预留图片上传与候选确认入口。
-
-验收标准：
-
-- 用户可以通过前端完成菜品维护。
-- 用户可以通过前端发起推荐并查看结果。
-- Demo 数据可从前端或种子脚本初始化。
-
-##### T5 实现 Agent skill 包装层并接入推荐接口
-
-范围：
-
-- 实现 Agent skill 读取菜品信息。
-- 实现 Agent skill 发起推荐请求。
-- 将 Agent 的自然语言输入转换为推荐接口所需结构。
-- 将接口返回结果转换为 Agent 可解释的自然语言输出。
-
-验收标准：
-
-- Agent 可以通过 skill 获取数据库中的菜品信息。
-- Agent 可以基于预算、人数和成员约束发起推荐。
-- Agent 输出包含总价、推荐菜品和推荐理由。
-
-##### T6 补充端到端验证、测试与本地 Docker 启动说明
+##### T4 补充 API/数据库验证、测试与 Docker 启动说明
 
 范围：
 
 - 补充数据库迁移测试、推荐引擎单元测试和接口测试。
-- 使用真实前端操作完成基础业务闭环。
-- 编写本地 Docker、Postgres、接口服务、前端和 Agent 的启动说明。
+- 编写本地 Docker、Postgres、migrate、接口服务的启动说明。
+- 记录 API 契约、数据库表和候选确认流程。
 
 验收标准：
 
-- 本地可通过 Docker Compose 启动数据库和接口服务。
-- Next.js 前端可正常访问 API。
-- Agent skill 可调用推荐接口。
-- 基础业务闭环可现场 Demo。
+- 本地可通过 Docker Compose 启动数据库、迁移任务和接口服务。
+- API 单元测试和接口测试可通过。
+- API 调用方可根据文档完成菜单 CRUD、推荐和图片候选确认流程。
+- 前端页面和 Agent skill 联调不作为 RFC-0002 的必需验收项。
 
 ### 影响范围
 
 预期新增或修改：
 
-- `apps/web/`：Next.js 前端页面和 API 调用。
 - `apps/api/`：接口服务、推荐引擎、数据库访问层。
-- `services/agent/`：NexAU Agent skill 包装层。
-- `packages/shared/`：共享类型、DTO、常量。
-- `docker/`：Postgres 与接口服务本地部署配置。
+- `apps/api/database/`：Postgres schema 与迁移脚本。
+- `docker/`：Postgres、migrate 与 API 服务本地部署配置。
 - `docs/rfcs/0002-ordering-system-architecture.md`：本 RFC。
 - `docs/rfcs/meta/0002-ordering-system-architecture.json`：RFC 元数据。
 
@@ -652,9 +620,8 @@ graph TD
 
 - Postgres 16。
 - Docker / Docker Compose。
-- Next.js。
-- Node.js/TypeScript API 服务。
-- NexAU Agent 运行时。
+- Node.js API 服务。
+- 前端 RFC-0003 或 Agent skill 作为 API 调用方，可选联调，不由 RFC-0002 实现。
 
 ## 测试方案
 
@@ -677,26 +644,25 @@ graph TD
 
 ### 集成测试
 
-- 使用前端新增 10 个以上菜品。
-- Agent skill 读取这些菜品并用于推荐。
-- 使用 5 人、250 元预算、A/B/C 成员约束跑通推荐链路。
-- 使用一张菜单图片触发识别，验证候选表与人工确认流程。
+- 使用 API 或迁移/种子脚本新增 10 个以上菜品。
+- 使用 5 人、250 元预算、A/B/C 成员约束调用推荐接口并验证结果。
+- 使用一张菜单图片触发图片候选流程，验证候选表与人工确认流程。
+- 可选：由 RFC-0003 前端或 Agent skill 调用同一 API 契约进行联调，不作为 RFC-0002 必需验收。
 
 ### 手动验证
 
 启动本地环境后执行：
 
-1. `docker compose up postgres api`
-2. 启动 Next.js 前端。
-3. 在前端新增或导入 Demo 菜品。
-4. 输入预算、人数、成员约束并发起推荐。
-5. 检查推荐结果包含总价、菜品列表和理由说明。
-6. 使用 Agent 通过 skill 发起一次推荐。
-7. 上传菜单图片并确认候选菜品不会绕过人工确认。
+1. `docker compose -f docker/compose.yaml up postgres migrate api`
+2. 通过 API 或种子脚本新增/导入 Demo 菜品。
+3. 调用推荐接口，输入预算、人数、成员约束。
+4. 检查推荐结果包含总价、菜品列表和理由说明。
+5. 上传菜单图片并确认候选菜品不会绕过人工确认。
+6. 如需联调，由前端 RFC-0003 或 Agent skill 访问 `http://localhost:3001` 调用同一 API 契约。
 
 ## 未解决的问题
 
-无。首期范围、本地部署方式、数据库边界、Agent skill 调用方式和图片识别挑战能力策略均已确认。
+无。首期范围已调整为 RFC-0002 只维护接口服务、数据库表和 Docker 部署；前端页面由 RFC-0003 维护，Agent skill 作为可选 API 调用方。
 
 ## 参考资料
 

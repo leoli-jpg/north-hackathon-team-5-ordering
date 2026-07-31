@@ -1,5 +1,5 @@
 {
-  "affects": "web,api,database,agent",
+  "affects": "api,database",
   "created": "2026-07-31",
   "priority": "P1",
   "related": [],
@@ -20,7 +20,7 @@
       "id": "T1",
       "ref": null,
       "status": "implemented",
-      "title": "确认本地部署拓扑与模块边界（Next.js 前端、接口服务、Postgres、Agent skill）"
+      "title": "确认 API、数据库和 Docker 部署边界"
     },
     {
       "depends_on": [
@@ -37,7 +37,7 @@
       ],
       "id": "T3",
       "ref": null,
-      "status": "pending",
+      "status": "implemented",
       "title": "实现接口服务基础能力（菜品 CRUD、推荐接口、图片候选接口）"
     },
     {
@@ -47,26 +47,7 @@
       "id": "T4",
       "ref": null,
       "status": "pending",
-      "title": "实现 Next.js 菜单管理与推荐结果展示页面"
-    },
-    {
-      "depends_on": [
-        "T3"
-      ],
-      "id": "T5",
-      "ref": null,
-      "status": "pending",
-      "title": "实现 Agent skill 包装层并接入推荐接口"
-    },
-    {
-      "depends_on": [
-        "T4",
-        "T5"
-      ],
-      "id": "T6",
-      "ref": null,
-      "status": "pending",
-      "title": "补充端到端验证、测试与本地 Docker 启动说明"
+      "title": "补充 API/数据库验证、测试与 Docker 启动说明"
     }
   ],
   "title": "点餐系统架构与数据库 Schema 设计",

@@ -2,11 +2,12 @@
   "name": "@ordering/api",
   "version": "0.1.0",
   "private": true,
-  "description": "RFC-0002 ordering API service placeholder for T1 topology validation.",
+  "description": "RFC-0002 ordering API service implementing menu CRUD, recommendations, and image candidates.",
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "db:migrate": "node database/migrate.js"
+    "db:migrate": "node database/migrate.js",
+    "test": "node src/recommendation.test.js && node src/server.test.js && node src/route.test.js"
   },
   "dependencies": {
     "pg": "^8.13.1"
