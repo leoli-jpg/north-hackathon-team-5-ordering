@@ -5,7 +5,7 @@
   "related": [],
   "requires": [],
   "rfc": "0001",
-  "status": "draft",
+  "status": "implemented",
   "tags": [
     "agent",
     "nexau",
@@ -17,7 +17,7 @@
       "depends_on": [],
       "id": "T1",
       "ref": null,
-      "status": "pending",
+      "status": "implemented",
       "title": "项目骨架与 NexAU Agent 配置（含原生 read_file/read_many_files/list_directory/glob/read_visual_file 工具绑定）"
     },
     {
@@ -26,7 +26,7 @@
       ],
       "id": "T2",
       "ref": null,
-      "status": "pending",
+      "status": "implemented",
       "title": "文字菜单解析与示例数据"
     },
     {
@@ -35,7 +35,7 @@
       ],
       "id": "T3",
       "ref": null,
-      "status": "pending",
+      "status": "implemented",
       "title": "多人自然语言需求结构化提取"
     },
     {
@@ -45,7 +45,7 @@
       ],
       "id": "T4",
       "ref": null,
-      "status": "pending",
+      "status": "implemented",
       "title": "推荐组合生成与规则校验"
     },
     {
@@ -54,7 +54,7 @@
       ],
       "id": "T5",
       "ref": null,
-      "status": "pending",
+      "status": "implemented",
       "title": "推荐理由、已满足约束与冲突说明"
     },
     {
@@ -63,7 +63,7 @@
       ],
       "id": "T6",
       "ref": null,
-      "status": "pending",
+      "status": "implemented",
       "title": "端到端验证、测试与使用说明（含 read_visual_file smoke test）"
     }
   ],

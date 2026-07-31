@@ -1,0 +1,28 @@
+# RFC-0001: NexAU 多人点餐推荐 Agent - 本地点餐 mock 工具
+#
+# NexAU SDK 通过 yaml_path + binding 加载该工具定义，binding 指向
+# agents.ordering_agent.tools.mock_ordering:run_ordering_tool。
+
+type: tool
+name: run_ordering_mock
+description: >-
+  Run the deterministic ordering-agent mock against text menu content and a
+  multi-person request. Use this for local smoke tests before LLM-backed
+  ordering tools are implemented.
+input_schema:
+  type: object
+  properties:
+    menu_text:
+      type: string
+      description: Text content of the restaurant menu.
+    request_text:
+      type: string
+      description: People count, budget, and member constraints.
+  required:
+    - menu_text
+    - request_text
+  additionalProperties: false
+disable_parallel: false
+lazy: false
+defer_loading: false
+binding: agents.ordering_agent.tools.mock_ordering:run_ordering_tool

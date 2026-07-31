@@ -1,0 +1,29 @@
+[
+  {
+    "id": "demo-beef-noodle",
+    "name": "红烧牛肉面",
+    "price_cents": 3200,
+    "category": "主食",
+    "source": "ocr",
+    "status": "pending",
+    "raw_text": "红烧牛肉面 ¥32"
+  },
+  {
+    "id": "demo-mushroom-rice",
+    "name": "香菇鸡肉饭",
+    "price_cents": 2800,
+    "category": "主食",
+    "source": "ocr",
+    "status": "pending",
+    "raw_text": "香菇鸡肉饭 ¥28"
+  },
+  {
+    "id": "demo-green-tea",
+    "name": "冰绿茶",
+    "price_cents": 1200,
+    "category": "饮品",
+    "source": "ocr",
+    "status": "pending",
+    "raw_text": "冰绿茶 ¥12"
+  }
+]
