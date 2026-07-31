@@ -1,0 +1,14 @@
+{
+  "name": "@ordering/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "RFC-0002 ordering API service placeholder for T1 topology validation.",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "db:migrate": "node database/migrate.js"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}

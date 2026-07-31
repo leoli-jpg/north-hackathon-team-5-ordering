@@ -7,7 +7,7 @@
     "0001"
   ],
   "rfc": "0002",
-  "status": "draft",
+  "status": "implementing",
   "tags": [
     "architecture",
     "database",
@@ -19,7 +19,7 @@
       "depends_on": [],
       "id": "T1",
       "ref": null,
-      "status": "pending",
+      "status": "implemented",
       "title": "确认本地部署拓扑与模块边界（Next.js 前端、接口服务、Postgres、Agent skill）"
     },
     {
@@ -28,7 +28,7 @@
       ],
       "id": "T2",
       "ref": null,
-      "status": "pending",
+      "status": "implemented",
       "title": "实现数据库 schema 与迁移脚本（菜品、标签、食材、推荐会话、图片候选表）"
     },
     {

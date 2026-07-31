@@ -1,0 +1,36 @@
+# RFC-0002: Local ordering system topology for T1.
+# This compose file defines only local infrastructure/service boundaries; app code is added by later subtasks.
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ordering}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ordering}
+      POSTGRES_DB: ${POSTGRES_DB:-ordering}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ordering} -d ${POSTGRES_DB:-ordering}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: postgres://${POSTGRES_USER:-ordering}:${POSTGRES_PASSWORD:-ordering}@postgres:5432/${POSTGRES_DB:-ordering}
+      API_PORT: ${API_PORT:-3001}
+      API_CORS_ORIGIN: ${API_CORS_ORIGIN:-http://localhost:3000}
+    ports:
+      - "${API_PORT:-3001}:${API_PORT:-3001}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

@@ -24,7 +24,7 @@
 
 | RFC | 标题 | 状态 | 优先级 |
 | --- | --- | --- | --- |
-| [RFC-0002](./0002-ordering-system-architecture.md) | 点餐系统架构与数据库 Schema 设计 | draft | P1 |
+| [RFC-0002](./0002-ordering-system-architecture.md) | 点餐系统架构与数据库 Schema 设计 | implementing | P1 |
 
 ## 如何提交 RFC
 
