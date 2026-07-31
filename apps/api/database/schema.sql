@@ -20,9 +20,19 @@ CREATE TABLE IF NOT EXISTS menu_items (
 CREATE TABLE IF NOT EXISTS tags (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL UNIQUE,
-  type TEXT NOT NULL DEFAULT 'general' CHECK (type IN ('ingredient', 'allergen', 'cuisine', 'spicy', 'diet', 'other')),
+  type TEXT NOT NULL DEFAULT 'general' CHECK (type IN ('general', 'ingredient', 'allergen', 'cuisine', 'spicy', 'diet', 'other')),
   description TEXT
 );
+
+DO $$
+BEGIN
+  ALTER TABLE tags DROP CONSTRAINT IF EXISTS tags_type_check;
+  ALTER TABLE tags ADD CONSTRAINT tags_type_check
+    CHECK (type IN ('general', 'ingredient', 'allergen', 'cuisine', 'spicy', 'diet', 'other'));
+EXCEPTION
+  WHEN undefined_table THEN
+    NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS menu_item_tags (
   menu_item_id UUID NOT NULL REFERENCES menu_items(id) ON DELETE CASCADE,
