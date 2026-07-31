@@ -18,7 +18,7 @@
 
 | RFC | 标题 | 状态 | 优先级 |
 | --- | --- | --- | --- |
-| [RFC-0001](./0001-nexau-ordering-agent.md) | NexAU 多人点餐推荐 Agent | draft | P1 |
+| [RFC-0001](./0001-nexau-ordering-agent.md) | NexAU 多人点餐推荐 Agent | implemented | P1 |
 
 ### 系统架构与数据模型
 
