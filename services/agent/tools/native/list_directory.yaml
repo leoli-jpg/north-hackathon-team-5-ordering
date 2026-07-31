@@ -1,6 +1,6 @@
-# RFC-0001: NexAU 多人点餐推荐 Agent - 原生 list_directory 工具
+# RFC-0002: NexAU Ordering System Agent - native list_directory tool.
 #
-# 用于定位 ordering_agent/data 等目录中的示例菜单、请求和视觉菜单文件。
+# Used to discover local menu, request, and visual menu file paths when needed.
 
 type: tool
 name: list_directory

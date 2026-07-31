@@ -1,0 +1,29 @@
+# RFC-0002: NexAU Agent skill 工具 - 获取菜单菜品
+#
+# 该工具是 Agent 与 apps/api 的边界。Agent 只调用结构化接口，不直接访问数据库。
+
+type: tool
+name: get_menu_items
+description: >-
+  Fetch active menu items from the ordering API. Use this before generating or
+  explaining a recommendation when the Agent needs current menu data.
+input_schema:
+  type: object
+  properties:
+    limit:
+      type: integer
+      minimum: 1
+      maximum: 200
+      description: Maximum number of menu items to fetch.
+    status:
+      type: string
+      enum:
+        - active
+        - all
+      description: Filter by menu item status.
+  required: []
+  additionalProperties: false
+disable_parallel: false
+lazy: false
+defer_loading: false
+binding: services.agent.skills.api_client:get_menu_items_tool
