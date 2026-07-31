@@ -93,7 +93,7 @@ export default function MenuUploadPage({ params }: Readonly<{ params: { sessionI
       <PageHeader
         eyebrow="步骤 2 / 6"
         title="上传菜单"
-        description="拍照、选择图片，或直接使用已准备好的两页演示菜单。识别、进度和错误全部由 Mock MenuGateway 模拟。"
+        description="拍照、选择图片，或使用两页演示菜单。识别过程可演示，图片元数据和确认菜品会优先同步到 API/Postgres。"
       />
       <div className="menu-upload-layout">
         <div className="form-card menu-upload-card">
@@ -158,7 +158,7 @@ export default function MenuUploadPage({ params }: Readonly<{ params: { sessionI
         <aside className="section-card menu-progress-panel" aria-live="polite">
           <div className="plan-status-row">
             <div>
-              <p className="eyebrow">Mock 任务</p>
+              <p className="eyebrow">识别任务</p>
               <h2>识别进度</h2>
             </div>
             <span className={`chip ${job.status === "completed" ? "chip-success" : isRecognizing ? "chip-warning" : ""}`}>
@@ -181,7 +181,7 @@ export default function MenuUploadPage({ params }: Readonly<{ params: { sessionI
           </div>
           {error && <p className="error-text" role="alert">{error}</p>}
           <button className="button button-primary button-block" type="button" onClick={handleRecognize} disabled={isRecognizing || isUploading}>
-            {isRecognizing ? "正在识别 Mock 菜单…" : "开始识别菜单 →"}
+            {isRecognizing ? "正在识别菜单…" : "开始识别菜单 →"}
           </button>
         </aside>
       </div>

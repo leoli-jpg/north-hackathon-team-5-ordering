@@ -1,18 +1,24 @@
 /**
- * RFC-0003: Frontend port composition for the mock-first ordering demo.
+ * RFC-0003: Frontend port composition.
  *
- * 页面只依赖这个 adapter locator；后续接入真实后端时替换 createMockFrontendPorts 的实现即可。
+ * 默认使用 HTTP Adapter 连接 RFC-0002 API/Postgres，并在服务不可用时降级到 Mock。
+ * 显式设置 NEXT_PUBLIC_RUNTIME_MODE=mock 可运行纯前端演示。
  */
+import { createHttpFrontendPorts } from "@/adapters/http-ports";
 import { createMockFrontendPorts } from "@/adapters/mock-ports";
 import type { FrontendPorts } from "@/ports/frontend-ports";
 
 let ports: FrontendPorts | null = null;
 
-export const runtimeMode = "mock" as const;
+export const runtimeMode = process.env.NEXT_PUBLIC_RUNTIME_MODE === "mock"
+  ? "mock"
+  : "http-with-mock-fallback";
 
 export function getFrontendPorts(): FrontendPorts {
   if (!ports) {
-    ports = createMockFrontendPorts();
+    ports = runtimeMode === "mock"
+      ? createMockFrontendPorts()
+      : createHttpFrontendPorts();
   }
   return ports;
 }

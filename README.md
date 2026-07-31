@@ -33,14 +33,14 @@ flowchart TD
    cp docker/.env.example docker/.env
    ```
 
-2. 启动 Postgres 与 API 占位服务：
+2. 启动 Postgres、执行迁移并启动真实 API：
 
    ```bash
    cd docker
-   docker compose up postgres api
+   docker compose up --build postgres migrate api
    ```
 
-3. 在另一个终端启动 Next.js 前端（T4 实现后）：
+3. 在另一个终端启动 Next.js 前端：
 
    ```bash
    cd apps/web
@@ -48,7 +48,7 @@ flowchart TD
    npm run dev
    ```
 
-4. 启动 Agent（T5 实现后）：
+4. 可选启动 Agent：
 
    ```bash
    python -m services.agent.run
@@ -63,8 +63,8 @@ flowchart TD
 
 ## 当前状态
 
-- T1 已完成：本地目录边界、Docker Compose 基础拓扑、环境变量模板和模块 README 已确认。
-- 后续 T2 将实现数据库 schema 与迁移脚本。
+- RFC-0002：Postgres schema、迁移、菜单 CRUD、图片候选和推荐 API 已实现。
+- RFC-0003：六步前端 Demo 已实现，HTTP Adapter 优先接入 API/Postgres，API 不可用时自动降级为 Mock。
 
 ## 环境变量与 smoke test
 

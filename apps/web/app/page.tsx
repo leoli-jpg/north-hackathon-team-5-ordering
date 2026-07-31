@@ -31,7 +31,7 @@ const flowSteps = [
 export default function HomePage() {
   return (
     <div className="app-shell">
-      <AppHeader title="纯 Mock 演示" />
+      <AppHeader title="API 优先演示" />
       <main className="home-page">
         <section className="hero-panel hero-split">
           <div className="hero-content">
@@ -46,7 +46,7 @@ export default function HomePage() {
             </div>
             <div className="hero-trust">
               <span><i aria-hidden="true">✓</i> 无需登录</span>
-              <span><i aria-hidden="true">✓</i> 无外部接口</span>
+              <span><i aria-hidden="true">✓</i> 数据库可持久化</span>
               <span><i aria-hidden="true">✓</i> 可演示冲突与恢复</span>
             </div>
           </div>
@@ -64,7 +64,7 @@ export default function HomePage() {
           <div className="section-heading">
             <p className="eyebrow">完整闭环</p>
             <h2 id="flow-title">三段体验，六个清晰步骤</h2>
-            <p>页面只突出当前任务，复杂约束留给 Mock Adapter 统一处理。</p>
+            <p>页面只突出当前任务，外部字段统一由 Gateway / Adapter 转换。</p>
           </div>
           <div className="feature-grid">
             {flowSteps.map((step, index) => (

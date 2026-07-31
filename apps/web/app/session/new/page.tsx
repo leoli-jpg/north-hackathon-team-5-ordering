@@ -55,7 +55,7 @@ export default function NewSessionPage() {
           <PageHeader
             eyebrow="步骤 1 / 6"
             title="创建一次聚餐"
-            description="用少量信息建立前端会话草稿。成员、菜单和后续推荐全部由本地 Mock Gateway 提供。"
+            description="用少量信息建立会话草稿。菜单和推荐优先写入本地 API/Postgres，服务不可用时自动降级为 Mock。"
           />
           <form className="form-card setup-form" onSubmit={handleSubmit}>
             <label>
@@ -93,13 +93,13 @@ export default function NewSessionPage() {
             </label>
             <div className="mock-callout">
               <span aria-hidden="true">✦</span>
-              <p><strong>演示数据已准备</strong><br />创建后自动带入两页菜单、5 个菜品和成员需求，可完整跑通流程。</p>
+              <p><strong>演示数据已准备</strong><br />创建后自动带入两页菜单和 5 个菜品；启动 API 时会同步写入数据库。</p>
             </div>
             {error && <p className="error-text" role="alert">{error}</p>}
             <div className="inline-actions step-actions">
               <Link className="button button-secondary" href="/">返回首页</Link>
               <button className="button button-primary" type="submit" disabled={isCreating}>
-                {isCreating ? "正在创建 Mock 会话…" : "创建并上传菜单 →"}
+                {isCreating ? "正在创建会话…" : "创建并上传菜单 →"}
               </button>
             </div>
           </form>

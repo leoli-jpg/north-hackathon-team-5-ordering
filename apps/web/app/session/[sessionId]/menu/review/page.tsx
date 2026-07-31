@@ -99,7 +99,7 @@ export default function MenuReviewPage({ params }: Readonly<{ params: { sessionI
       {items.length === 0 && !error ? (
         <div className="loading-panel" role="status">
           <div className="loading-spinner" />
-          <p>正在读取 Mock 菜单快照…</p>
+          <p>正在读取菜单快照…</p>
         </div>
       ) : (
         <>
@@ -121,7 +121,7 @@ export default function MenuReviewPage({ params }: Readonly<{ params: { sessionI
                 <figure key={image.id}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={image.previewUrl} alt={`菜单原图第 ${image.pageIndex} 页`} />
-                  <figcaption>第 {image.pageIndex} 页 · Mock 本地图片</figcaption>
+                  <figcaption>第 {image.pageIndex} 页 · 会话图片</figcaption>
                 </figure>
               ))}
               <p className="risk-note">黄色/红色提示同时附带文字，不只依赖颜色表达。</p>
@@ -237,7 +237,7 @@ export default function MenuReviewPage({ params }: Readonly<{ params: { sessionI
           <div className="inline-actions step-actions">
             <Link className="button button-secondary" href={`/session/${params.sessionId}/menu`}>← 返回上传</Link>
             <button className="button button-primary" type="button" onClick={handleSave} disabled={isSaving}>
-              {isSaving ? "正在保存 Mock 菜单…" : "确认菜单并填写成员需求 →"}
+              {isSaving ? "正在保存菜单…" : "确认菜单并填写成员需求 →"}
             </button>
           </div>
         </>

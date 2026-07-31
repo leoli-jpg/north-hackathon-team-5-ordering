@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 export default function AppHeader({ title }: Readonly<{ title: string }>) {
+  const usesDatabase = process.env.NEXT_PUBLIC_RUNTIME_MODE !== "mock";
+
   return (
     <header className="app-header">
       <Link className="brand-link" href="/" aria-label="Ordering Guide Demo 首页">
@@ -10,7 +12,9 @@ export default function AppHeader({ title }: Readonly<{ title: string }>) {
       <div className="session-title" aria-live="polite">{title}</div>
       <nav className="header-actions" aria-label="页面辅助操作">
         <Link href="/session/new">新建</Link>
-        <span className="runtime-badge"><span aria-hidden="true">●</span> 纯 Mock</span>
+        <span className="runtime-badge">
+          <span aria-hidden="true">●</span> {usesDatabase ? "API + 数据库" : "纯 Mock"}
+        </span>
       </nav>
     </header>
   );

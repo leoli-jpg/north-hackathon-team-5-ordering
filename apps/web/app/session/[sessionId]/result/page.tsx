@@ -68,7 +68,7 @@ export default function ResultPage({ params }: Readonly<{ params: { sessionId: s
   if (isGenerating) {
     return (
       <section className="stacked-page">
-        <PageHeader eyebrow="步骤 6 / 6" title="正在生成点餐方案" description="Mock RecommendationGateway 正在执行价格、硬约束和覆盖检查。" />
+        <PageHeader eyebrow="步骤 6 / 6" title="正在生成点餐方案" description="RecommendationGateway 正在执行数据库菜单筛选、价格和硬约束检查。" />
         <div className="generation-panel" role="status">
           <div className="generation-orbit"><span>✦</span></div>
           <h2>组合菜品与成员需求</h2>
@@ -86,7 +86,7 @@ export default function ResultPage({ params }: Readonly<{ params: { sessionId: s
   if (error || !result) {
     return (
       <section className="stacked-page">
-        <PageHeader eyebrow="步骤 6 / 6" title="推荐结果" description="Mock 推荐任务未能完成。" />
+        <PageHeader eyebrow="步骤 6 / 6" title="推荐结果" description="推荐任务未能完成。" />
         <div className="error-state" role="alert">
           <span className="quality-icon" aria-hidden="true">!</span>
           <h1>生成失败</h1>
