@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import threading
 import urllib.request
+from pathlib import Path
 
 from agents.ordering_agent.models import RecommendationResult
 from agents.ordering_agent.server import create_server
@@ -123,6 +124,56 @@ def test_json_output_is_serializable_for_mock_io_contract() -> None:
     assert len(data["menu_items"]) == 12
     assert [member["member_id"] for member in data["members"]] == ["A", "B", "C"]
     assert data["recommendation"]["total_price"] <= data["recommendation"]["budget"]
+
+
+def test_ocr_menu_demo_fixture_matches_pending_candidate_contract() -> None:
+    fixture_path = Path(__file__).resolve().parent / "fixtures" / "ocr_menu_demo.json"
+    sql_fixture_path = Path(__file__).resolve().parents[1] / "apps" / "api" / "database" / "fixtures" / "ocr_menu_demo.sql"
+    fixture_items = json.loads(fixture_path.read_text(encoding="utf-8"))
+    sql_fixture = sql_fixture_path.read_text(encoding="utf-8")
+
+    expected_items = [
+        {
+            "id": "demo-beef-noodle",
+            "name": "红烧牛肉面",
+            "price_cents": 3200,
+            "category": "主食",
+            "source": "ocr",
+            "status": "pending",
+            "raw_text": "红烧牛肉面 ¥32",
+        },
+        {
+            "id": "demo-mushroom-rice",
+            "name": "香菇鸡肉饭",
+            "price_cents": 2800,
+            "category": "主食",
+            "source": "ocr",
+            "status": "pending",
+            "raw_text": "香菇鸡肉饭 ¥28",
+        },
+        {
+            "id": "demo-green-tea",
+            "name": "冰绿茶",
+            "price_cents": 1200,
+            "category": "饮品",
+            "source": "ocr",
+            "status": "pending",
+            "raw_text": "冰绿茶 ¥12",
+        },
+    ]
+
+    assert fixture_items == expected_items
+    assert all(item["source"] == "ocr" for item in fixture_items)
+    assert all(item["status"] == "pending" for item in fixture_items)
+    assert all(isinstance(item["price_cents"], int) for item in fixture_items)
+    assert "INSERT INTO menu_images" in sql_fixture
+    assert "INSERT INTO menu_item_candidates" in sql_fixture
+    assert "'ocr'" in sql_fixture
+    assert "source = EXCLUDED.source" in sql_fixture
+    assert "status = EXCLUDED.status" in sql_fixture
+    assert "'pending'" in sql_fixture
+    assert all(item["name"] in sql_fixture for item in fixture_items)
+    assert all(str(item["price_cents"]) in sql_fixture for item in fixture_items)
 
 
 def test_http_mock_service_starts_and_recommends() -> None:
