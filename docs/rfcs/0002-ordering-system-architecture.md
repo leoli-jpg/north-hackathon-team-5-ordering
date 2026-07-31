@@ -1,0 +1,705 @@
+# RFC-0002: 点餐系统架构与数据库 Schema 设计
+
+## 摘要
+
+本 RFC 设计 TOPIC B「点餐系统」的基础架构：本地 Next.js 前端负责菜品录入、菜单展示和推荐结果展示；本地接口服务负责菜品 CRUD、推荐引擎、图片候选识别接口和数据库访问；Postgres 作为本地持久化数据库；NexAU Agent 通过 skill 调用接口服务读取菜品信息并发起推荐。
+
+本 RFC 首期聚焦 MVP：前端手工维护菜单、Agent skill 读取数据库、根据预算/人数/成员约束生成推荐组合，并预留「识别图片添加菜品」作为挑战能力。挑战能力先通过候选表与人工确认实现，不把 OCR 准确率作为基础能力验收条件。
+
+## 动机
+
+RFC-0001 已定义 NexAU 多人点餐推荐 Agent 的能力边界，但首期实现需要从本地文字菜单/示例数据升级为可演示的业务系统：菜单需要被持久化，前端需要能维护菜品，Agent 需要通过稳定接口读取结构化菜品信息，推荐结果也需要可复现、可展示、可扩展。
+
+如果缺少统一架构和数据库 schema，容易出现三类问题：前端直接操作数据库导致权限和部署复杂；Agent 直接读取临时文件或前端状态导致数据不可复用；图片识别结果直接写入正式菜单导致错误数据污染推荐链路。因此本 RFC 将系统拆成前端、接口服务、数据库、Agent skill 四个明确边界，并用候选表隔离图片识别风险。
+
+## 设计
+
+### 概述
+
+本地演示环境采用以下拓扑：
+
+- `apps/web`：Next.js 前端，面向用户完成菜单管理和推荐交互。
+- `apps/api`：接口服务，承载 REST API、数据库访问、推荐引擎和图片候选能力。
+- `services/agent`：NexAU Agent 运行时与 skill 包装层，将自然语言请求转成结构化接口调用。
+- `packages/shared`：前后端共享的类型、常量和 DTO。
+- `docker/`：本地 Postgres 与接口服务容器编排。
+
+```mermaid
+flowchart TD
+    U["用户"] --> FE["Next.js 前端"]
+    FE --> API["接口服务 / API"]
+    API --> DB[("Postgres")]
+    API --> REC["推荐引擎"]
+    API --> IMG["图片上传 / 候选识别"]
+    AG["NexAU Agent"] --> SKILL["Agent Skill 层"]
+    SKILL --> API
+    SKILL --> DB
+
+    API -->|REST| FE
+    SKILL -->|tool call| API
+```
+
+核心原则：
+
+1. **前端不直连数据库**：所有数据访问都通过 API 服务。
+2. **Agent 只通过 skill 调用能力**：Agent 不直接操作 UI，也不直接写数据库。
+3. **推荐引擎可独立验证**：推荐逻辑放在 API 服务内，便于单元测试和回归测试。
+4. **图片识别走候选表**：识别结果先进入 staging 区，再人工确认后进入正式菜品表。
+
+### 范围与非目标
+
+#### 首期范围
+
+- 支持前端页面手工新增、修改、查询菜品信息。
+- 支持菜品基础字段：名称、描述、价格、分类、状态、图片 URL、扩展属性。
+- 支持菜品标签、食材、过敏原、辣度等结构化信息。
+- 支持 Agent 通过 skill 读取数据库中的菜品信息。
+- 支持根据预算、人数和成员约束生成推荐菜品组合。
+- 支持推荐结果包含总价、菜品列表、理由说明和约束满足情况。
+- 预留图片识别挑战能力：上传图片、识别候选菜品、人工确认后入库。
+
+#### 首期非目标
+
+- 不实现支付、优惠券、复杂会员体系或生产级权限系统。
+- 不把 OCR 自动识别作为基础能力，也不承诺图片识别完全准确。
+- 不要求前端直接连接 Postgres。
+- 不让 Agent 直接修改正式菜单表。
+- 不在首期实现复杂多目标优化器；首期推荐以可行性和可解释性为主。
+
+### 当前假设
+
+- 本地演示环境，不需要生产级认证。
+- 前端使用 Next.js。
+- 后端接口服务建议采用 Node.js/TypeScript + Prisma，或等价的轻量 API 框架。
+- 本地 Docker 部署 Postgres；接口服务可通过容器访问数据库。
+- Agent skill 通过 API 服务访问数据库，而不是由前端或 Agent 直接操作数据库。
+- 图片识别先走候选表，再人工确认入库。
+
+### 本地部署拓扑
+
+建议本地使用 `docker compose` 管理基础设施，前端在宿主机运行。
+
+```yaml
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ordering
+      POSTGRES_PASSWORD: ordering
+      POSTGRES_DB: ordering
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  api:
+    build: ./apps/api
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgres://ordering:ordering@postgres:5432/ordering
+
+volumes:
+  pgdata:
+```
+
+建议运行方式：
+
+- `npm run dev`：启动 Next.js 前端。
+- `docker compose up postgres api`：启动数据库和接口服务。
+- `python -m services.agent.run`：启动 NexAU Agent，或按项目实际命令运行。
+
+### 关键设计决策
+
+#### 1. API 服务作为数据访问边界
+
+前端和 Agent 都通过 API 服务访问数据。API 服务负责权限、校验、事务、推荐逻辑和数据库访问，避免前端或 Agent 直接操作 Postgres。
+
+理由：
+
+- 前端只需关心用户交互，不承担数据库连接配置。
+- Agent skill 可以保持轻量，只负责参数转换和结果解释。
+- 推荐逻辑集中在 API 服务中，便于单元测试和回归测试。
+
+#### 2. 价格使用 `price_cents` 整数存储
+
+菜品价格使用分（cents）作为整数存储，例如 48 元存为 `4800`。
+
+理由：
+
+- 避免浮点数精度问题。
+- 推荐总价、预算校验和金额计算更稳定。
+- 后续扩展支付或优惠时不需要迁移价格字段。
+
+#### 3. 标签与食材拆分建模
+
+菜品标签通过 `tags` + `menu_item_tags` 建模；食材通过 `menu_item_ingredients` 建模，并保留 `confidence`。
+
+理由：
+
+- 标签用于分类、辣度、过敏原、菜系等可枚举或半结构化信息。
+- 食材用于过敏/忌口等硬约束校验。
+- `confidence` 为图片识别或 LLM 推断结果提供可信度字段，后续可支持人工校正。
+
+#### 4. 图片识别结果先进入候选表
+
+图片识别挑战能力不直接写入 `menu_items`，而是写入 `menu_item_candidates`，由用户确认后再提升到正式菜品表。
+
+理由：
+
+- 图片 OCR/视觉识别可能误识别菜名、价格或标签。
+- 人工确认能避免错误菜单污染推荐链路。
+- 候选表保留 `source_image_id` 和 `confidence`，便于调试和后续优化。
+
+#### 5. 推荐引擎与 Agent 解耦
+
+推荐引擎作为 API 服务内部能力，Agent skill 可以调用它；前端也可以直接调用它。
+
+理由：
+
+- 前端 Demo 不依赖 Agent 在线即可验证推荐接口。
+- Agent 可以复用同一套推荐逻辑，避免两套规则。
+- 后续替换推荐算法时，前端和 Agent skill 的接口契约保持稳定。
+
+### 数据模型
+
+#### 核心表
+
+```sql
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE TABLE menu_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  description TEXT,
+  price_cents INTEGER NOT NULL CHECK (price_cents >= 0),
+  category TEXT,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('draft', 'active', 'inactive')),
+  image_url TEXT,
+  attributes JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE tags (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  type TEXT NOT NULL DEFAULT 'general' CHECK (type IN ('ingredient', 'allergen', 'cuisine', 'spicy', 'diet', 'other')),
+  description TEXT
+);
+
+CREATE TABLE menu_item_tags (
+  menu_item_id UUID NOT NULL REFERENCES menu_items(id) ON DELETE CASCADE,
+  tag_id UUID NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+  PRIMARY KEY (menu_item_id, tag_id)
+);
+
+CREATE TABLE menu_item_ingredients (
+  menu_item_id UUID NOT NULL REFERENCES menu_items(id) ON DELETE CASCADE,
+  ingredient TEXT NOT NULL,
+  confidence NUMERIC(3,2) NOT NULL DEFAULT 1.00 CHECK (confidence BETWEEN 0 AND 1),
+  PRIMARY KEY (menu_item_id, ingredient)
+);
+
+CREATE TABLE recommendation_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  budget_cents INTEGER NOT NULL CHECK (budget_cents > 0),
+  person_count INTEGER NOT NULL CHECK (person_count > 0),
+  member_constraints JSONB NOT NULL DEFAULT '[]'::jsonb,
+  status TEXT NOT NULL DEFAULT 'running' CHECK (status IN ('running', 'completed', 'failed')),
+  result_summary JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE recommendation_items (
+  session_id UUID NOT NULL REFERENCES recommendation_sessions(id) ON DELETE CASCADE,
+  menu_item_id UUID NOT NULL REFERENCES menu_items(id) ON DELETE CASCADE,
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
+  unit_price_cents INTEGER NOT NULL CHECK (unit_price_cents >= 0),
+  subtotal_cents INTEGER NOT NULL CHECK (subtotal_cents >= 0),
+  PRIMARY KEY (session_id, menu_item_id)
+);
+```
+
+#### 图片识别挑战能力扩展表
+
+```sql
+CREATE TABLE menu_images (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  file_name TEXT NOT NULL,
+  storage_path TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'ocr', 'vision')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processed', 'failed')),
+  raw_response JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE menu_item_candidates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  source_image_id UUID REFERENCES menu_images(id) ON DELETE SET NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  price_cents INTEGER,
+  attributes JSONB NOT NULL DEFAULT '{}'::jsonb,
+  confidence NUMERIC(3,2) NOT NULL DEFAULT 1.00 CHECK (confidence BETWEEN 0 AND 1),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+#### 索引
+
+```sql
+CREATE INDEX idx_menu_items_active_price ON menu_items(status, price_cents);
+CREATE INDEX idx_menu_item_tags_tag_id ON menu_item_tags(tag_id, menu_item_id);
+CREATE INDEX idx_menu_item_ingredients_ingredient ON menu_item_ingredients(ingredient);
+CREATE INDEX idx_recommendation_sessions_created_at ON recommendation_sessions(created_at DESC);
+CREATE INDEX idx_menu_items_name_fts ON menu_items USING gin (to_tsvector('simple', name));
+```
+
+#### 更新时间触发器
+
+```sql
+CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS trigger AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_menu_items_updated_at
+BEFORE UPDATE ON menu_items
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+```
+
+### 接口契约
+
+#### 菜品 CRUD
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- | --- |
+| `GET` | `/api/menu-items` | 查询菜品列表，支持分页、关键词、分类、状态过滤 |
+| `POST` | `/api/menu-items` | 新增菜品 |
+| `PATCH` | `/api/menu-items/:id` | 修改菜品 |
+| `DELETE` | `/api/menu-items/:id` | 删除/下架菜品 |
+
+新增菜品请求示例：
+
+```json
+{
+  "name": "招牌牛肉饭",
+  "description": "牛肉 + 米饭",
+  "price_cents": 4800,
+  "category": "主食",
+  "tags": ["牛肉", "辣度:中"],
+  "ingredients": ["牛肉", "米饭"],
+  "attributes": {
+    "spicy_level": "medium",
+    "cuisine": "中式"
+  }
+}
+```
+
+#### 推荐接口
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- | --- |
+| `POST` | `/api/recommendations` | 生成推荐方案 |
+| `GET` | `/api/recommendations/:id` | 查询推荐结果 |
+
+推荐请求示例：
+
+```json
+{
+  "budget_cents": 25000,
+  "person_count": 5,
+  "member_constraints": [
+    {
+      "member_id": "A",
+      "allergies": ["peanut"],
+      "spicy_tolerance": "none"
+    },
+    {
+      "member_id": "B",
+      "dislikes": ["pork"],
+      "spicy_tolerance": "mild"
+    }
+  ]
+}
+```
+
+推荐响应示例：
+
+```json
+{
+  "session_id": "uuid",
+  "total_price_cents": 23200,
+  "items": [
+    {
+      "menu_item_id": "uuid",
+      "name": "番茄鸡蛋饭",
+      "quantity": 1,
+      "unit_price_cents": 2800,
+      "subtotal_cents": 2800
+    }
+  ],
+  "reasons": [
+    "总价未超过预算",
+    "避开花生过敏",
+    "满足不吃辣限制"
+  ]
+}
+```
+
+#### 图片识别挑战能力接口
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- | --- |
+| `POST` | `/api/menu-images` | 上传菜单图片 |
+| `POST` | `/api/menu-images/:id/recognize` | 触发图片识别 |
+| `POST` | `/api/menu-items/from-candidates` | 将候选菜品确认入库 |
+
+### 推荐流程
+
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant FE as Next.js
+    participant API as 接口服务
+    participant DB as Postgres
+    participant AG as NexAU Agent
+    participant SK as Agent Skill
+
+    U->>FE: 输入预算、人数、成员约束
+    FE->>API: POST /api/recommendations
+    API->>DB: 读取 active 菜品与标签
+    API->>API: 计算候选组合与约束校验
+    API-->>FE: 返回推荐方案
+    FE-->>U: 展示总价、菜品、理由
+
+    AG->>SK: 发起推荐请求
+    SK->>API: 调用推荐 skill
+    API->>DB: 读取菜品数据
+    API-->>SK: 返回推荐结果
+    SK-->>AG: 交付结构化结果
+```
+
+推荐策略：
+
+1. 先筛选 `active` 菜品。
+2. 根据成员约束过滤不兼容菜品。
+3. 在预算内生成候选组合。
+4. 按偏好覆盖率、多样性、预算利用率打分。
+5. 返回前 N 个方案与理由说明。
+
+### 图片识别挑战能力设计
+
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant FE as Next.js
+    participant API as 接口服务
+    participant IMG as 图片识别模块
+    participant DB as Postgres
+
+    U->>FE: 上传菜单图片
+    FE->>API: POST /api/menu-images
+    API->>DB: 保存 menu_images
+    API->>IMG: 触发识别
+    IMG->>DB: 写入 menu_item_candidates
+    API-->>FE: 返回候选列表
+    U->>FE: 人工确认/修改
+    FE->>API: POST /api/menu-items/from-candidates
+    API->>DB: 提升到 menu_items
+```
+
+扩展说明：
+
+- MVP 阶段不要求自动 OCR 完全准确。
+- 图片识别结果先进入 `menu_item_candidates`，再由人工确认。
+- 后续可接入 NexAU `read_visual_file` 或独立 OCR 服务。
+
+### 架构图
+
+```mermaid
+flowchart LR
+    subgraph Web["apps/web"]
+        MenuPage["菜单管理页面"]
+        RecPage["推荐结果页面"]
+        ImagePage["图片识别页面"]
+    end
+
+    subgraph API["apps/api"]
+        MenuAPI["菜品 CRUD API"]
+        RecEngine["推荐引擎"]
+        ImageAPI["图片上传/识别 API"]
+        SkillAPI["Agent Skill API"]
+        DBAccess["数据库访问层"]
+    end
+
+    subgraph DB["Postgres"]
+        MenuItem["menu_items"]
+        Tags["tags / menu_item_tags"]
+        Ingredients["menu_item_ingredients"]
+        Sessions["recommendation_sessions / items"]
+        Candidates["menu_item_candidates"]
+    end
+
+    subgraph Agent["services/agent"]
+        NexAU["NexAU Agent"]
+        Skill["Skill 包装层"]
+    end
+
+    MenuPage --> MenuAPI
+    RecPage --> RecEngine
+    ImagePage --> ImageAPI
+    NexAU --> Skill --> SkillAPI
+    MenuAPI --> DBAccess --> MenuItem
+    MenuAPI --> DBAccess --> Tags
+    MenuAPI --> DBAccess --> Ingredients
+    RecEngine --> DBAccess --> MenuItem
+    RecEngine --> Sessions
+    ImageAPI --> DBAccess --> Candidates
+```
+
+## 权衡取舍
+
+### 考虑过的替代方案
+
+| 方案 | 优点 | 缺点 | 决定 |
+| --- | --- | --- | --- |
+| 前端直连 Postgres | 实现最少，少一层服务 | 暴露数据库连接，权限和部署复杂，不适合 Agent skill 复用 | 不采用 |
+| Agent 直接读写数据库 | Agent 能力更强，调用路径短 | Agent 误操作风险高，推荐逻辑难以独立测试 | 不采用 |
+| API 服务作为数据访问边界 | 职责清晰，前端和 Agent 可复用接口，推荐逻辑可测试 | 多一个服务层，本地启动步骤略多 | 采用 |
+| 图片识别直接入库 | 自动化程度高，流程短 | OCR 错误会污染正式菜单和推荐结果 | 不采用 |
+| 图片识别先入候选表 | 可人工确认，错误可隔离，便于调试 | 多一步确认流程 | 采用 |
+
+### 缺点
+
+- 本地需要同时运行前端、接口服务和 Postgres，启动步骤比单文件 Demo 复杂。
+- API 服务增加了一层抽象，首期实现成本高于纯脚本方案。
+- 标签和食材拆分建模比单字段 JSON 更复杂，但可测试性和约束校验能力更好。
+- 图片识别挑战能力需要候选确认流程，不能承诺全自动准确入库。
+
+## 实现计划
+
+### 阶段划分
+
+1. **阶段一：确认本地部署拓扑与模块边界**
+   - 确定 Next.js 前端、接口服务、Postgres、Agent skill 的目录结构。
+   - 确定本地 Docker 启动方式和环境变量。
+
+2. **阶段二：数据库 schema 与迁移脚本**
+   - 实现菜品、标签、食材、推荐会话、推荐明细、图片候选表。
+   - 添加索引和更新时间触发器。
+
+3. **阶段三：接口服务基础能力**
+   - 实现菜品 CRUD、推荐接口、图片候选接口。
+   - 将推荐引擎与数据库访问层解耦。
+
+4. **阶段四：前端页面**
+   - 实现菜单管理页面和推荐结果展示页面。
+   - 预留图片上传与候选确认页面。
+
+5. **阶段五：Agent skill 包装层**
+   - 实现 Agent skill 读取菜品和发起推荐的接口。
+   - 将 Agent 输出映射为前端可展示的结构化推荐结果。
+
+6. **阶段六：验证与文档**
+   - 补充单元测试、接口测试和端到端验证。
+   - 编写本地 Docker 启动说明和 Demo 数据说明。
+
+### 子任务分解
+
+#### 依赖关系图
+
+```mermaid
+graph TD
+    T1["T1 本地部署拓扑与模块边界"]
+    T2["T2 数据库 schema 与迁移"]
+    T3["T3 接口服务基础能力"]
+    T4["T4 Next.js 前端页面"]
+    T5["T5 Agent skill 包装层"]
+    T6["T6 验证、测试与启动说明"]
+
+    T1 --> T2
+    T2 --> T3
+    T3 --> T4
+    T3 --> T5
+    T4 --> T6
+    T5 --> T6
+```
+
+#### 子任务列表
+
+| ID | 标题 | 依赖 | Ref |
+| --- | --- | --- | --- |
+| T1 | 确认本地部署拓扑与模块边界 | 无 |  |
+| T2 | 实现数据库 schema 与迁移脚本 | T1 |  |
+| T3 | 实现接口服务基础能力 | T2 |  |
+| T4 | 实现 Next.js 菜单管理与推荐结果展示页面 | T3 |  |
+| T5 | 实现 Agent skill 包装层并接入推荐接口 | T3 |  |
+| T6 | 补充端到端验证、测试与本地 Docker 启动说明 | T4, T5 |  |
+
+#### 子任务定义
+
+##### T1 确认本地部署拓扑与模块边界
+
+范围：
+
+- 创建或确认 `apps/web`、`apps/api`、`services/agent`、`packages/shared`、`docker/` 目录。
+- 明确前端、接口服务、数据库、Agent skill 的调用关系。
+- 定义本地环境变量和 Docker Compose 基础配置。
+
+验收标准：
+
+- 本地项目结构清晰，职责边界明确。
+- `docker compose` 能启动 Postgres，接口服务可通过环境变量连接数据库。
+- README 或 RFC 能说明本地启动方式。
+
+##### T2 实现数据库 schema 与迁移脚本
+
+范围：
+
+- 实现 `menu_items`、`tags`、`menu_item_tags`、`menu_item_ingredients`。
+- 实现 `recommendation_sessions`、`recommendation_items`。
+- 实现图片识别挑战能力所需的 `menu_images`、`menu_item_candidates`。
+- 添加索引和更新时间触发器。
+
+验收标准：
+
+- 迁移脚本可在空 Postgres 数据库中执行成功。
+- 菜品、标签、食材、推荐结果、图片候选表均可正常读写。
+- 价格字段使用整数分存储。
+
+##### T3 实现接口服务基础能力
+
+范围：
+
+- 实现菜品 CRUD API。
+- 实现推荐接口，包含预算、人数、过敏、忌口、辣度等约束校验。
+- 实现图片上传、识别触发、候选确认入库接口。
+
+验收标准：
+
+- 前端可通过 API 新增、修改、查询菜品。
+- 推荐接口能返回总价、菜品列表和理由说明。
+- 图片识别接口不直接污染正式菜单表。
+
+##### T4 实现 Next.js 菜单管理与推荐结果展示页面
+
+范围：
+
+- 实现菜单列表、新增、编辑、下架/删除页面。
+- 实现预算、人数、成员约束输入页面。
+- 展示推荐结果、总价、已满足约束和冲突说明。
+- 预留图片上传与候选确认入口。
+
+验收标准：
+
+- 用户可以通过前端完成菜品维护。
+- 用户可以通过前端发起推荐并查看结果。
+- Demo 数据可从前端或种子脚本初始化。
+
+##### T5 实现 Agent skill 包装层并接入推荐接口
+
+范围：
+
+- 实现 Agent skill 读取菜品信息。
+- 实现 Agent skill 发起推荐请求。
+- 将 Agent 的自然语言输入转换为推荐接口所需结构。
+- 将接口返回结果转换为 Agent 可解释的自然语言输出。
+
+验收标准：
+
+- Agent 可以通过 skill 获取数据库中的菜品信息。
+- Agent 可以基于预算、人数和成员约束发起推荐。
+- Agent 输出包含总价、推荐菜品和推荐理由。
+
+##### T6 补充端到端验证、测试与本地 Docker 启动说明
+
+范围：
+
+- 补充数据库迁移测试、推荐引擎单元测试和接口测试。
+- 使用真实前端操作完成基础业务闭环。
+- 编写本地 Docker、Postgres、接口服务、前端和 Agent 的启动说明。
+
+验收标准：
+
+- 本地可通过 Docker Compose 启动数据库和接口服务。
+- Next.js 前端可正常访问 API。
+- Agent skill 可调用推荐接口。
+- 基础业务闭环可现场 Demo。
+
+### 影响范围
+
+预期新增或修改：
+
+- `apps/web/`：Next.js 前端页面和 API 调用。
+- `apps/api/`：接口服务、推荐引擎、数据库访问层。
+- `services/agent/`：NexAU Agent skill 包装层。
+- `packages/shared/`：共享类型、DTO、常量。
+- `docker/`：Postgres 与接口服务本地部署配置。
+- `docs/rfcs/0002-ordering-system-architecture.md`：本 RFC。
+- `docs/rfcs/meta/0002-ordering-system-architecture.json`：RFC 元数据。
+
+预期外部依赖：
+
+- Postgres 16。
+- Docker / Docker Compose。
+- Next.js。
+- Node.js/TypeScript API 服务。
+- NexAU Agent 运行时。
+
+## 测试方案
+
+### 单元测试
+
+- 数据库 schema：
+  - 迁移脚本可在空库执行。
+  - 价格字段使用 `price_cents` 整数存储。
+  - 标签、食材、推荐会话、图片候选表结构符合设计。
+- 推荐引擎：
+  - 总价不超过预算。
+  - 过敏菜品被拒绝。
+  - 忌口菜品被拒绝。
+  - 辣度超出容忍范围被拒绝。
+  - 预算不足时返回冲突说明。
+- 图片候选：
+  - 识别候选进入 `menu_item_candidates`。
+  - 人工确认后进入 `menu_items`。
+  - 拒绝候选不会污染正式菜单。
+
+### 集成测试
+
+- 使用前端新增 10 个以上菜品。
+- Agent skill 读取这些菜品并用于推荐。
+- 使用 5 人、250 元预算、A/B/C 成员约束跑通推荐链路。
+- 使用一张菜单图片触发识别，验证候选表与人工确认流程。
+
+### 手动验证
+
+启动本地环境后执行：
+
+1. `docker compose up postgres api`
+2. 启动 Next.js 前端。
+3. 在前端新增或导入 Demo 菜品。
+4. 输入预算、人数、成员约束并发起推荐。
+5. 检查推荐结果包含总价、菜品列表和理由说明。
+6. 使用 Agent 通过 skill 发起一次推荐。
+7. 上传菜单图片并确认候选菜品不会绕过人工确认。
+
+## 未解决的问题
+
+无。首期范围、本地部署方式、数据库边界、Agent skill 调用方式和图片识别挑战能力策略均已确认。
+
+## 参考资料
+
+- RFC-0001：NexAU 多人点餐推荐 Agent
+- Hackathon 参赛说明：TOPIC B 点餐系统
+- 飞书文档：North Hackathon 第4弹参赛说明

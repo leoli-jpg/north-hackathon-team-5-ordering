@@ -20,6 +20,12 @@
 | --- | --- | --- | --- |
 | [RFC-0001](./0001-nexau-ordering-agent.md) | NexAU 多人点餐推荐 Agent | draft | P1 |
 
+### 系统架构与数据模型
+
+| RFC | 标题 | 状态 | 优先级 |
+| --- | --- | --- | --- |
+| [RFC-0002](./0002-ordering-system-architecture.md) | 点餐系统架构与数据库 Schema 设计 | draft | P1 |
+
 ## 如何提交 RFC
 
 1. 阅读 RFC 文档，确认范围和设计。
