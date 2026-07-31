@@ -1,0 +1,39 @@
+# RFC-0001: NexAU 多人点餐推荐 Agent - 原生 read_many_files 工具
+#
+# 批量读取文字菜单/请求/说明文件。显式请求的图片仍会返回 inline data，
+# 但完整视觉理解建议走 read_visual_file。
+
+type: tool
+name: read_many_files
+description: >
+  Read multiple files matching include glob patterns, concatenating text content
+  with file separators and optional exclusions.
+input_schema:
+  type: object
+  properties:
+    include:
+      type: array
+      items:
+        type: string
+      description: Glob patterns or paths to include.
+    exclude:
+      type: array
+      items:
+        type: string
+      description: Optional glob patterns to exclude.
+    recursive:
+      type: boolean
+      description: Search recursively.
+      default: true
+    use_default_excludes:
+      type: boolean
+      description: Apply default excludes such as .git and __pycache__.
+      default: true
+    file_filtering_options:
+      type: object
+      description: File filtering options such as respect_git_ignore.
+  required:
+    - include
+disable_parallel: false
+lazy: false
+defer_loading: false

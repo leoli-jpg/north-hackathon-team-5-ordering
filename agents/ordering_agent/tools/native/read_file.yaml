@@ -1,0 +1,28 @@
+# RFC-0001: NexAU 多人点餐推荐 Agent - 原生 read_file 工具
+#
+# 读取文字菜单、配置或请求文本。图片/视频菜单请使用 read_visual_file。
+
+type: tool
+name: read_file
+description: >
+  Read a text file by path with optional line offset and limit. Use this for
+  text menus and request files. For menu images or videos, use read_visual_file.
+input_schema:
+  type: object
+  properties:
+    file_path:
+      type: string
+      description: Path to the text file to read.
+    offset:
+      type: integer
+      minimum: 0
+      description: Optional 0-based line offset.
+    limit:
+      type: integer
+      minimum: 1
+      description: Optional maximum number of lines to read.
+  required:
+    - file_path
+disable_parallel: false
+lazy: false
+defer_loading: false
